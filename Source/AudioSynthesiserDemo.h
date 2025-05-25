@@ -64,6 +64,14 @@ struct SineWaveSound final : public SynthesiserSound
 };
 
 //==============================================================================
+/** Augmented triad sound adds a major third and augmented fifth to the root */
+struct AugmentedTriadSound final : public SynthesiserSound
+{
+    bool appliesToNote (int /*midiNoteNumber*/) override    { return true; }
+    bool appliesToChannel (int /*midiChannel*/) override    { return true; }
+};
+
+//==============================================================================
 /** Our demo synth voice just plays a sine wave.. */
 struct SineWaveVoice final : public SynthesiserVoice
 {
@@ -156,6 +164,117 @@ private:
 };
 
 //==============================================================================
+/** Augmented triad voice plays a root, major third, and augmented fifth */
+struct AugmentedTriadVoice final : public SynthesiserVoice
+{
+    bool canPlaySound (SynthesiserSound* sound) override
+    {
+        return dynamic_cast<AugmentedTriadSound*> (sound) != nullptr;
+    }
+
+    void startNote (int midiNoteNumber, float velocity,
+                    SynthesiserSound*, int /*currentPitchWheelPosition*/) override
+    {
+        currentAngle1 = currentAngle2 = currentAngle3 = 0.0;
+        level = velocity * 0.15;
+        tailOff = 0.0;
+
+        // Root note
+        auto rootFrequency = MidiMessage::getMidiNoteInHertz (midiNoteNumber);
+        auto rootCyclesPerSample = rootFrequency / getSampleRate();
+        angleDelta1 = rootCyclesPerSample * MathConstants<double>::twoPi;
+        
+        // Major third (4 semitones up)
+        auto thirdFrequency = MidiMessage::getMidiNoteInHertz (midiNoteNumber + 4);
+        auto thirdCyclesPerSample = thirdFrequency / getSampleRate();
+        angleDelta2 = thirdCyclesPerSample * MathConstants<double>::twoPi;
+        
+        // Augmented fifth (8 semitones up)
+        auto fifthFrequency = MidiMessage::getMidiNoteInHertz (midiNoteNumber + 8);
+        auto fifthCyclesPerSample = fifthFrequency / getSampleRate();
+        angleDelta3 = fifthCyclesPerSample * MathConstants<double>::twoPi;
+    }
+
+    void stopNote (float /*velocity*/, bool allowTailOff) override
+    {
+        if (allowTailOff)
+        {
+            if (approximatelyEqual (tailOff, 0.0))
+                tailOff = 1.0;
+        }
+        else
+        {
+            clearCurrentNote();
+            angleDelta1 = angleDelta2 = angleDelta3 = 0.0;
+        }
+    }
+
+    void pitchWheelMoved (int /*newValue*/) override                              {}
+    void controllerMoved (int /*controllerNumber*/, int /*newValue*/) override    {}
+
+    void renderNextBlock (AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override
+    {
+        if (approximatelyEqual (angleDelta1, 0.0))
+            return;
+
+        if (tailOff > 0.0)
+        {
+            while (--numSamples >= 0)
+            {
+                // Mix the three sine waves for the triad
+                auto currentSample = (float) ((std::sin (currentAngle1) + 
+                                              std::sin (currentAngle2) * 0.7 + 
+                                              std::sin (currentAngle3) * 0.5) * 
+                                              level * tailOff / 2.2);
+
+                for (auto i = outputBuffer.getNumChannels(); --i >= 0;)
+                    outputBuffer.addSample (i, startSample, currentSample);
+
+                currentAngle1 += angleDelta1;
+                currentAngle2 += angleDelta2;
+                currentAngle3 += angleDelta3;
+                ++startSample;
+
+                tailOff *= 0.99;
+
+                if (tailOff <= 0.005)
+                {
+                    clearCurrentNote();
+                    angleDelta1 = angleDelta2 = angleDelta3 = 0.0;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            while (--numSamples >= 0)
+            {
+                // Mix the three sine waves for the triad
+                auto currentSample = (float) ((std::sin (currentAngle1) + 
+                                              std::sin (currentAngle2) * 0.7 + 
+                                              std::sin (currentAngle3) * 0.5) * 
+                                              level / 2.2);
+
+                for (auto i = outputBuffer.getNumChannels(); --i >= 0;)
+                    outputBuffer.addSample (i, startSample, currentSample);
+
+                currentAngle1 += angleDelta1;
+                currentAngle2 += angleDelta2;
+                currentAngle3 += angleDelta3;
+                ++startSample;
+            }
+        }
+    }
+
+    using SynthesiserVoice::renderNextBlock;
+
+private:
+    double currentAngle1 = 0.0, currentAngle2 = 0.0, currentAngle3 = 0.0;
+    double angleDelta1 = 0.0, angleDelta2 = 0.0, angleDelta3 = 0.0;
+    double level = 0.0, tailOff = 0.0;
+};
+
+//==============================================================================
 // This is an audio source that streams the output of our demo synth.
 struct SynthAudioSource final : public AudioSource
 {
@@ -164,8 +283,9 @@ struct SynthAudioSource final : public AudioSource
         // Add some voices to our synth, to play the sounds..
         for (auto i = 0; i < 4; ++i)
         {
-            synth.addVoice (new SineWaveVoice());   // These voices will play our custom sine-wave sounds..
-            synth.addVoice (new SamplerVoice());    // and these ones play the sampled sounds
+            synth.addVoice (new SineWaveVoice());        // For sine wave sounds
+            synth.addVoice (new AugmentedTriadVoice());  // For augmented triad sounds
+            synth.addVoice (new SamplerVoice());         // For sampled sounds
         }
 
         // ..and add a sound for them to play...
@@ -176,6 +296,12 @@ struct SynthAudioSource final : public AudioSource
     {
         synth.clearSounds();
         synth.addSound (new SineWaveSound());
+    }
+
+    void setUsingAugmentedTriadSound()
+    {
+        synth.clearSounds();
+        synth.addSound (new AugmentedTriadSound());
     }
 
     void setUsingSampledSound()
@@ -299,6 +425,10 @@ public:
         sineButton.setToggleState (true, dontSendNotification);
         sineButton.onClick = [this] { synthAudioSource.setUsingSineWaveSound(); };
 
+        addAndMakeVisible (augmentedButton);
+        augmentedButton.setRadioGroupId (321);
+        augmentedButton.onClick = [this] { synthAudioSource.setUsingAugmentedTriadSound(); };
+
         addAndMakeVisible (sampledButton);
         sampledButton.setRadioGroupId (321);
         sampledButton.onClick = [this] { synthAudioSource.setUsingSampledSound(); };
@@ -334,7 +464,8 @@ public:
     {
         keyboardComponent   .setBounds (8, 96, getWidth() - 16, 64);
         sineButton          .setBounds (16, 176, 150, 24);
-        sampledButton       .setBounds (16, 200, 150, 24);
+        augmentedButton     .setBounds (16, 200, 150, 24);
+        sampledButton       .setBounds (16, 224, 150, 24);
         liveAudioDisplayComp.setBounds (8, 8, getWidth() - 16, 64);
     }
 
@@ -351,8 +482,9 @@ private:
     SynthAudioSource synthAudioSource        { keyboardState };
     MidiKeyboardComponent keyboardComponent  { keyboardState, MidiKeyboardComponent::horizontalKeyboard};
 
-    ToggleButton sineButton     { "Use sine wave" };
-    ToggleButton sampledButton  { "Use sampled sound" };
+    ToggleButton sineButton      { "Use sine wave" };
+    ToggleButton augmentedButton { "Use augmented triad" };
+    ToggleButton sampledButton   { "Use sampled sound" };
 
     LiveScrollingAudioDisplay liveAudioDisplayComp;
 

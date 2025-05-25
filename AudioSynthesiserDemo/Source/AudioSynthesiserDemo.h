@@ -666,7 +666,7 @@ struct SineWaveSound final : public SynthesiserSound
 //==============================================================================
 struct SineWaveVoice final : public SynthesiserVoice
 {
-    enum class ChordType { Major, Minor, Diminished };
+    enum class ChordType { Major, Minor, Diminished, Augmented };
 
     SineWaveVoice() : chordType(ChordType::Major), voicingAmplitude{ 1.0, 0.8, 0.6 } {}
 
@@ -695,6 +695,7 @@ struct SineWaveVoice final : public SynthesiserVoice
         case ChordType::Major:      intervals = { 0, 4, 7 }; break; // Root, major third, perfect fifth
         case ChordType::Minor:      intervals = { 0, 3, 7 }; break; // Root, minor third, perfect fifth
         case ChordType::Diminished: intervals = { 0, 3, 6 }; break; // Root, minor third, diminished fifth
+        case ChordType::Augmented:  intervals = { 0, 4, 8 }; break; // Root, major third, augmented fifth
         default:                    intervals = { 0, 4, 7 }; break;
         }
 
@@ -923,6 +924,10 @@ public:
         dimButton.setRadioGroupId(322);
         dimButton.onClick = [this] { synthAudioSource.setChordType(SineWaveVoice::ChordType::Diminished); };
 
+        addAndMakeVisible(augButton);
+        augButton.setRadioGroupId(322);
+        augButton.onClick = [this] { synthAudioSource.setChordType(SineWaveVoice::ChordType::Augmented); };
+
         // Voicing sliders
         addAndMakeVisible(rootAmpSlider);
         rootAmpSlider.setRange(0.1, 1.0, 0.01);
@@ -976,6 +981,7 @@ public:
         majorButton.setBounds(180, 176, 100, 24);
         minorButton.setBounds(180, 200, 100, 24);
         dimButton.setBounds(180, 224, 100, 24);
+        augButton.setBounds(180, 248, 100, 24);
 
         rootAmpSlider.setBounds(300, 176, 100, 24);
         thirdAmpSlider.setBounds(300, 200, 100, 24);
@@ -1009,6 +1015,7 @@ private:
     ToggleButton majorButton{ "Major" };
     ToggleButton minorButton{ "Minor" };
     ToggleButton dimButton{ "Diminished" };
+    ToggleButton augButton{ "Augmented" };
     Slider rootAmpSlider{ "Root Amp" };
     Slider thirdAmpSlider{ "Third Amp" };
     Slider fifthAmpSlider{ "Fifth Amp" };
