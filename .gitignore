@@ -2,6 +2,33 @@
 **/Builds/
 **/JuceLibraryCode/
 **/.vs/
+
+# Visual Studio files and build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Build results and binaries
 *.exe
 *.dll
 *.lib
@@ -9,7 +36,6 @@
 *.ilk
 *.pdb
 *.obj
-*.user
 *.aps
 *.pch
 *.vspscc
@@ -19,6 +45,17 @@
 *.svclog
 *.scc
 
+# Visual Studio specific
+.vs/
+ipch/
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
 # OS-specific ignores
 .DS_Store
 .DS_Store?
@@ -26,4 +63,4 @@
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
